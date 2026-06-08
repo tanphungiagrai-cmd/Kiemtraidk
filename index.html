@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blox Fruits - Săn Leviathan</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 20px; user-select: none; -webkit-user-select: none; }
+        .panel { background: #1e1e1e; padding: 20px; border-radius: 10px; max-width: 600px; margin: 20px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .hidden { display: none; }
+        input[type="text"], input[type="password"] { width: 80%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #444; background: #333; color: #fff; text-align: center; font-size: 16px; }
+        .btn-group { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; }
+        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .login-timer { font-size: 22px; color: #ffeb3b; font-weight: bold; background: #2a2a2a; padding: 8px 15px; border-radius: 5px; border: 1px dashed #ffeb3b; min-width: 70px; }
+        .dot { width: 15px; height: 15px; border-radius: 50%; display: inline-block; vertical-align: middle; margin: 0 5px; }
+        .green { background-color: #4caf50; box-shadow: 0 0 8px #4caf50; }
+        .red { background-color: #f44336; box-shadow: 0 0 8px #f44336; }
+        .avatar { width: 100px; height: 100px; border-radius: 50%; margin: 10px 0; border: 2px solid #555; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #444; padding: 10px; text-align: center; }
+        #timer { font-size: 24px; color: #ffeb3b; font-weight: bold; margin: 10px 0; }
+        .admin-btn { position: fixed; bottom: 10px; right: 10px; background: #333; font-size: 12px; color: #ccc; z-index: 999; }
+    </style>
+</head>
+<body>
+
+    <div id="login-panel" class="panel">
+        <h2>Nhập tên Roblox của bạn</h2>
+        <input type="text" id="username" placeholder="Tên tài khoản...">
+        
+        <div class="btn-group">
+            <button onclick="login()">Bắt đầu</button>
+            <div id="login-time-display" class="login-timer"><span id="login-time-left">90</span>s</div>
+        </div>
+    </div>
+
+    <div id="user-panel" class="panel hidden">
+        <h2 id="display-name"></h2>
+        <img id="avatar" class="avatar" src="" alt="Avatar">
+        
+        <div id="timer">Thời gian còn lại: <span id="time-left">90</span>s</div>
+        
+        <div>Trạng thái của bạn: <span id="user-dot" class="dot red"></span></div>
+        <p id="status-text" class="red">Chưa xác minh</p>
+
+        <div id="upload-section">
+            <p>Tải ảnh nói chuyện với Spy lên đây:</p>
+            <input type="file" id="imageInput" accept="image/*">
+            <p id="loading-msg" style="color: orange; display: none;">⏳ Hệ thống đang quét ảnh, chờ chút...</p>
+        </div>
+        <br>
+        <button onclick="logout()" style="background: #555;">Đăng xuất</button>
+    </div>
+
+    <button class="admin-btn" onclick="showAdminLogin()">Khu vực Quản Trị</button>
+
+    <div id="admin-login-panel" class="panel hidden">
+        <h2>Đăng nhập Admin</h2>
+        <input type="password" id="admin-pwd" placeholder="Mật khẩu...">
+        <br>
+        <button onclick="adminLogin()">Vào</button>
+        <button onclick="backToLogin()" style="background: #555;">Quay lại</button>
+    </div>
+
+    <div id="admin-dashboard" class="panel hidden" style="max-width: 800px;">
+        <h2>💻 Giám Sát Leviathan</h2>
+        <div style="display: flex; justify-content: space-around; background: #222; padding: 10px; border-radius: 5px;">
+            <p>Tổng: <strong id="stat-total">0</strong></p>
+            <p>Sẵn sàng: <strong id="stat-green" style="color: #4caf50;">0</strong></p>
+            <p>Chưa/IDK: <strong id="stat-red" style="color: #f44336;">0</strong></p>
+        </div>
+        <button onclick="adminAction('reset_system')" style="background: #d32f2f; width: 100%; margin-top: 10px;">Làm mới hệ thống thiết bị (Xóa hết)</button>
+        <button onclick="logoutAdmin()" style="background: #555; width: 100%; margin-top: 5px;">Thoát Admin</button>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Người chơi</th>
+                    <th>Trạng thái</th>
+                    <th>Khóa?</th>
+                    <th>Chức năng</th>
+                </tr>
+            </thead>
+            <tbody id="admin-table"></tbody>
+        </table>
+    </div>
+
+<script>
+    // --- ĐOẠN CODE NGĂN CHẶN F5, F12 VÀ CHUỘT PHẢI ---
+    document.addEventListener('contextmenu', event => event.preventDefault()); // Chặn chuột phải
+    
+    document.onkeydown = function(e) {
+        // Chặn F5 (Tải lại trang)
+        if (e.keyCode == 116) {
+            e.preventDefault();
+            return false;
+        }
+        // Chặn Ctrl+R (Tải lại trang)
+        if (e.ctrlKey && e.keyCode == 82) {
+            e.preventDefault();
+            return false;
+        }
+        // Chặn F12
+        if (e.keyCode == 123) {
+            e.preventDefault();
+            return false;
+        }
+        // Chặn Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+        if (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74 || e.keyCode == 67)) {
+            e.preventDefault();
+            return false;
+        }
+        // Chặn Ctrl+U (Xem nguồn trang)
+        if (e.ctrlKey && e.keyCode == 85) {
+            e.preventDefault();
+            return false;
+        }
+    };
+
+    let currentUser = "";
+    let timerInterval = null;
+    let timeLeft = 90;
+    let adminInterval = null;
+
+    window.onload = function() {
+        startGlobalTimer();
+    };
+
+    function startGlobalTimer() {
+        timeLeft = 90;
+        updateTimerDisplays();
+        clearInterval(timerInterval);
+        
+        timerInterval = setInterval(async () => {
+            timeLeft--;
+            updateTimerDisplays();
+            
+            if(timeLeft <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById('upload-section').style.display = 'none';
+                alert("Hết thời gian 90s! Hệ thống đã khóa tải ảnh.");
+                
+                if(currentUser) {
+                    await fetch('/api/lock', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({username: currentUser})
+                    });
+                }
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplays() {
+        const loginTime = document.getElementById('login-time-left');
+        const userTime = document.getElementById('time-left');
+        if(loginTime) loginTime.innerText = timeLeft;
+        if(userTime) userTime.innerText = timeLeft;
+    }
+
+    async function login() {
+        const user = document.getElementById('username').value.trim();
+        if(!user) return alert("Chưa nhập tên!");
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user})
+            });
+            const data = await res.json();
+
+            if(data.success) {
+                currentUser = user;
+                document.getElementById('login-panel').classList.add('hidden');
+                document.getElementById('user-panel').classList.remove('hidden');
+                
+                document.getElementById('display-name').innerText = user;
+                document.getElementById('avatar').src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(user) + "&background=random&color=fff&size=100";
+                
+                updateStatusUI(data.user.status);
+                
+                if (data.user.status === 'green' || timeLeft <= 0) {
+                    document.getElementById('timer').style.display = 'none';
+                }
+            } else {
+                alert(data.error);
+            }
+        } catch (error) {
+            alert("Lỗi kết nối: Vì đang chạy trên nền tảng không có Máy chủ (Backend), chức năng này không thể gửi dữ liệu.");
+        }
+    }
+
+    function logout() {
+        currentUser = "";
+        document.getElementById('user-panel').classList.add('hidden');
+        document.getElementById('login-panel').classList.remove('hidden');
+        document.getElementById('username').value = "";
+    }
+
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('loading-msg').style.display = 'block';
+
+        Tesseract.recognize(file, 'eng+vie').then(async function(result) {
+            document.getElementById('loading-msg').style.display = 'none';
+            const text = result.data.text;
+            const lowerText = text.toLowerCase();
+            let finalStatus = 'red';
+
+            if (lowerText.includes("don't know") || lowerText.includes("anything yet")) {
+                alert("❌ HỆ THỐNG PHÁT HIỆN BỊ IDK!");
+                finalStatus = 'red';
+            } else if (lowerText.includes("1,500") || lowerText.includes("1500") || lowerText.includes("leviathan") || lowerText.includes("ngoài kia")) {
+                alert("✅ XÁC MINH THÀNH CÔNG! BẠN ĐÃ SẴN SÀNG.");
+                finalStatus = 'green';
+                clearInterval(timerInterval);
+                document.getElementById('timer').style.display = 'none';
+                if(document.getElementById('login-time-display')) {
+                    document.getElementById('login-time-display').style.display = 'none';
+                }
+            } else {
+                alert("⚠️ Không đọc được chữ cần thiết. Hãy chụp rõ đoạn chat với Spy!");
+                return;
+            }
+
+            try {
+                await fetch('/api/update_status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: currentUser, status: finalStatus})
+                });
+            } catch (error) {
+                console.log("Không có backend để lưu trạng thái");
+            }
+            updateStatusUI(finalStatus);
+        }).catch(function(err) {
+            document.getElementById('loading-msg').style.display = 'none';
+            alert("Lỗi quét ảnh: " + err.message);
+        });
+    });
+
+    function updateStatusUI(status) {
+        const dot = document.getElementById('user-dot');
+        const txt = document.getElementById('status-text');
+        if(status === 'green') {
+            dot.className = 'dot green';
+            txt.innerText = 'Đã xác minh thành công (Sẵn sàng)';
+            txt.style.color = '#4caf50';
+            document.getElementById('upload-section').style.display = 'none';
+        } else {
+            dot.className = 'dot red';
+            txt.innerText = 'Chưa xác minh / Bị IDK';
+            txt.style.color = '#f44336';
+            document.getElementById('upload-section').style.display = 'block';
+        }
+    }
+
+    function showAdminLogin() {
+        document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('admin-login-panel').classList.remove('hidden');
+    }
+    
+    function backToLogin() {
+        document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+        if (currentUser) {
+            document.getElementById('user-panel').classList.remove('hidden');
+        } else {
+            document.getElementById('login-panel').classList.remove('hidden');
+        }
+    }
+
+    function logoutAdmin() {
+        clearInterval(adminInterval);
+        document.getElementById('admin-dashboard').classList.add('hidden');
+        document.getElementById('login-panel').classList.remove('hidden');
+        document.getElementById('admin-pwd').value = "";
+    }
+
+    async function adminLogin() {
+        const pwd = document.getElementById('admin-pwd').value;
+        try {
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password: pwd})
+            });
+            const data = await res.json();
+            if(data.success) {
+                document.getElementById('admin-login-panel').classList.add('hidden');
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                loadAdminData();
+                clearInterval(adminInterval);
+                adminInterval = setInterval(loadAdminData, 2000);
+            } else {
+                alert(data.error);
+            }
+        } catch (error) {
+            alert("Lỗi kết nối: Nền tảng này không có máy chủ để xác thực Admin.");
+        }
+    }
+
+    async function loadAdminData() {
+        try {
+            const res = await fetch('/api/admin/data');
+            const data = await res.json();
+            if(!data.success) return;
+
+            document.getElementById('stat-total').innerText = data.stats.total;
+            document.getElementById('stat-green').innerText = data.stats.verified;
+            document.getElementById('stat-red').innerText = data.stats.unverified;
+
+            const tbody = document.getElementById('admin-table');
+            tbody.innerHTML = '';
+
+            for (const [user, info] of Object.entries(data.data)) {
+                const tr = document.createElement('tr');
+                
+                const tdUser = document.createElement('td');
+                tdUser.innerText = user;
+                tr.appendChild(tdUser);
+
+                const tdStatus = document.createElement('td');
+                const dot = document.createElement('div');
+                dot.className = 'dot ' + info.status;
+                tdStatus.appendChild(dot);
+                tr.appendChild(tdStatus);
+
+                const tdLock = document.createElement('td');
+                tdLock.innerText = info.locked ? 'Bị khóa' : 'Không';
+                tdLock.style.color = info.locked ? 'red' : 'white';
+                tr.appendChild(tdLock);
+
+                const tdAction = document.createElement('td');
+                
+                const btnUnlock = document.createElement('button');
+                btnUnlock.innerText = 'Gỡ Khóa';
+                btnUnlock.onclick = function() { adminAction('unlock', user); };
+                tdAction.appendChild(btnUnlock);
+
+                const btnResetTime = document.createElement('button');
+                btnResetTime.innerText = 'Gỡ thời gian';
+                btnResetTime.style.background = '#ff9800';
+                btnResetTime.onclick = function() { adminAction('reset_time', user); };
+                tdAction.appendChild(btnResetTime);
+
+                tr.appendChild(tdAction);
+                tbody.appendChild(tr);
+            }
+        } catch (error) {
+            // Im lặng trên console nếu không load được data
+        }
+    }
+
+    async function adminAction(action, username='') {
+        if (action === 'reset_system' && !confirm("Bạn có chắc chắn muốn xóa sạch dữ liệu không?")) return;
+        try {
+            await fetch('/api/admin/action', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action, username})
+            });
+            if(action === 'reset_time') {
+                startGlobalTimer();
+            }
+            loadAdminData();
+        } catch (error) {
+            alert("Lỗi: Không có máy chủ để thực hiện lệnh này.");
+        }
+    }
+</script>
+</body>
+</html>
